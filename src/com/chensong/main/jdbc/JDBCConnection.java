@@ -2,9 +2,17 @@ package com.chensong.main.jdbc;
 
 import com.chensong.main.entitys.NewConnection;
 import com.chensong.main.exception.SQLBadGrammarException;
+import com.chensong.main.support.ExucuteSQLTimeoutFunction;
 
 import java.sql.*;
-import java.util.*;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.*;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 public class JDBCConnection {
 
@@ -13,6 +21,10 @@ public class JDBCConnection {
      * MySQL 8.0 以下版本 - JDBC 驱动名及数据库 URL
       */
     private static final String JDBC_DRIVER = "com.mysql.jdbc.Driver";
+    // MySQL 8.0 以上版本 - JDBC 驱动名
+    //static final String JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
+    private static ExecutorService executor = Executors.newSingleThreadExecutor();
+
     static{
         try {
             Class.forName(JDBC_DRIVER);
@@ -22,6 +34,13 @@ public class JDBCConnection {
         }
     }
 
+    /**
+     * 获取连接池中的连接，未获取到直接连接，并将连接放到连接池
+     * @param url
+     * @param username
+     * @param pwd
+     * @return
+     */
     private static Connection getConnectionFromPool(String url,String username,String pwd){
         Connection c = connectionPool.get(url);
         if(c == null){
@@ -53,7 +72,6 @@ public class JDBCConnection {
             // 打开链接
             conn = getConnectionFromPool(newConnection.getUrl(),
                     newConnection.getUsernameTextField().getText(),newConnection.getPwdTextField().getText());
-
             // 执行查询
             stmt = conn.createStatement();
             String sql;
@@ -75,6 +93,9 @@ public class JDBCConnection {
         return tablesList;
     }
 
+    /**
+     * 释放连接池
+     */
     public static void releaseConncetions() {
         try{
             for(String url:connectionPool.keySet()){
@@ -89,41 +110,50 @@ public class JDBCConnection {
         }
     }
 
-    public static String getShowCreateTable(NewConnection currentConnection, Object tableName) {
-        Connection conn = connectionPool.get(currentConnection.getUrl());
-        // 执行查询
-        Statement stmt = null;
-        ResultSet rs = null;
-        String ddl = "";
-        try{
-
-            stmt = conn.createStatement();
-            String sql;
-            sql = "show create table "+tableName.toString()+";";
-            rs = stmt.executeQuery(sql);
-            while(rs.next()){
-                ddl = rs.getString("Create Table");
-            }
-            rs.close();
-            stmt.close();
-        }catch(SQLException ex){
-            ex.printStackTrace();
-        }finally {
+    /**
+     * 查询DDL语句
+     * @param currentConnection
+     * @param tableName
+     * @return
+     */
+    public static String getShowCreateTable(NewConnection currentConnection, Object tableName) throws Exception{
+        return executeSQLTimeout(t -> {
+            Connection conn = connectionPool.get(currentConnection.getUrl());
+            // 执行查询
+            Statement stmt = null;
+            ResultSet rs = null;
+            String ddl = "";
             try{
-                if(stmt != null){
-                    stmt.close();
-                }
-                if(rs != null){
-                    rs.close();
-                }
-            }catch (SQLException ex){
-                ex.printStackTrace();
-            }
 
-        }
-        return ddl;
+                stmt = conn.createStatement();
+                String sql;
+                sql = "show create table "+t+";";
+                rs = stmt.executeQuery(sql);
+                while(rs.next()){
+                    ddl = rs.getString("Create Table");
+                }
+                rs.close();
+                stmt.close();
+            }catch(SQLException ex){
+                ex.printStackTrace();
+            }finally {
+                commonCloseStsAndRs(stmt,rs);
+
+            }
+            return ddl;
+        },tableName.toString());
+
     }
 
+    /**
+     * 分页查单表记录
+     * @param columnNames
+     * @param currentConnection
+     * @param tableName
+     * @param start
+     * @param end
+     * @return
+     */
     public static Object[][] getTableRowsLimit(String[] columnNames,NewConnection currentConnection, Object tableName, int start, int end) {
         Connection conn = connectionPool.get(currentConnection.getUrl());
         // 执行查询
@@ -155,16 +185,7 @@ public class JDBCConnection {
         }catch(SQLException ex){
             ex.printStackTrace();
         }finally {
-            try{
-                if(stmt != null){
-                    stmt.close();
-                }
-                if(rs != null){
-                    rs.close();
-                }
-            }catch (SQLException ex){
-                ex.printStackTrace();
-            }
+           commonCloseStsAndRs(stmt,rs);
 
         }
         return rows;
@@ -173,62 +194,57 @@ public class JDBCConnection {
     /**
      * 执行用户自定义语句的查询语句
      */
-    public static Map<String,Object> getTableRowsByCustomer(NewConnection currentConnection, String sql) throws SQLBadGrammarException {
-        Map<String,Object> result = new HashMap<>();
-        Connection conn = getConnectionFromPool(currentConnection.getUrl(),currentConnection.getUsernameTextField().getText(),currentConnection.getPwdTextField().getText());
-        // 执行查询
-        Statement stmt = null;
-        ResultSet rs = null;
-        String ddl = "";
-        String[][] rows =null;
-
-        try{
-            stmt = conn.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE,ResultSet.CONCUR_UPDATABLE);
-            rs = stmt.executeQuery(sql);
-            rs.last();
-            //记录总行数
-            int totalRows = rs.getRow();
-            String[] columnNames = getColumnsFromResutSetByTest(rs);
-            result.put("columnNames",columnNames);
-            int totalColumns = columnNames.length;
-            rs.absolute(0);
-            rows = new String[totalRows][totalColumns];
-            result.put("rows",rows);
-            int ir = 0;
-
-            while(rs.next()){
-                String[] row = new String[totalColumns];
-                int ic = 0;
-
-                for(int i = 0;i < totalColumns;i++){
-                    row[ic] = rs.getString(columnNames[i]);
-                    ic++;
-                }
-                rows[ir] = row;
-                ir++;
-            }
-            rs.close();
-            stmt.close();
-        }catch(SQLException ex){
-            String msg = ex.getMessage();
-            String state = ex.getSQLState();
-            throw new SQLBadGrammarException(msg);
-        }finally {
+    public static Map<String,Object> getTableRowsByCustomer(NewConnection currentConnection, String sql) throws Exception {
+       return executeSQLTimeout((t) ->{
+            Map<String,Object> result = new HashMap<>();
+            Connection conn = getConnectionFromPool(currentConnection.getUrl(),currentConnection.getUsernameTextField().getText(),currentConnection.getPwdTextField().getText());
+            // 执行查询
+            Statement stmt = null;
+            ResultSet rs = null;
+            String[][] rows =null;
             try{
-                if(stmt != null){
-                    stmt.close();
-                }
-                if(rs != null){
-                    rs.close();
-                }
-            }catch (SQLException ex){
-                ex.printStackTrace();
-            }
+                stmt = conn.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE,ResultSet.CONCUR_UPDATABLE);
+                rs = stmt.executeQuery(t);
+                rs.last();
+                //记录总行数
+                int totalRows = rs.getRow();
+                String[] columnNames = getColumnsFromResutSetByTest(rs);
+                result.put("columnNames",columnNames);
+                int totalColumns = columnNames.length;
+                rs.absolute(0);
+                rows = new String[totalRows][totalColumns];
+                result.put("rows",rows);
+                int ir = 0;
 
-        }
-        return result;
+                while(rs.next()){
+                    String[] row = new String[totalColumns];
+                    int ic = 0;
+
+                    for(int i = 0;i < totalColumns;i++){
+                        row[ic] = rs.getString(columnNames[i]);
+                        ic++;
+                    }
+                    rows[ir] = row;
+                    ir++;
+                }
+                rs.close();
+                stmt.close();
+            }catch(SQLException ex){
+                String msg = ex.getMessage();
+                throw new SQLBadGrammarException(msg);
+            }finally {
+               commonCloseStsAndRs(stmt,rs);
+
+            }
+            return result;
+        },sql);
     }
 
+    /**
+     * 获取结果集中包含的列名数组
+     * @param rs
+     * @return
+     */
     private static String[] getColumnsFromResutSetByTest(ResultSet rs) {
         List<String> columns = new ArrayList<>();
         try {
@@ -249,52 +265,59 @@ public class JDBCConnection {
      * @param currentConnection
      * @param sql
      */
-    public static String executeNonDQL(NewConnection currentConnection, String sql)throws SQLBadGrammarException {
-        Connection conn = getConnectionFromPool(currentConnection.getUrl(),currentConnection.getUsernameTextField().getText(),currentConnection.getPwdTextField().getText());
-        // 执行查询
-        Statement stmt = null;
-        ResultSet rs = null;
-        String result = "";
+    public static String executeNonDQL(NewConnection currentConnection, String sql)throws Exception {
+        return executeSQLTimeout((t) ->{
+            Connection conn = getConnectionFromPool(currentConnection.getUrl(),currentConnection.getUsernameTextField().getText(),currentConnection.getPwdTextField().getText());
+            // 执行查询
+            Statement stmt = null;
+            ResultSet rs = null;
+            String result = "";
+            try{
+                stmt = conn.createStatement();
+                stmt.execute(t);
+                int effectRows = stmt.getUpdateCount();
+                result = effectRows+" rows effected.";
+                if(effectRows == -1){
+                    rs = stmt.getResultSet();
+                    rs.last();
+                    String r = rs.getString(2);
+                    result = r;
+                }
+                stmt.close();
+            }catch(SQLException ex){
+                String msg = ex.getMessage();
+                throw new SQLBadGrammarException(msg);
+            }finally {
+                commonCloseStsAndRs(stmt,rs);
+
+            }
+            return result;
+        },sql);
+
+    }
+
+    private static void commonCloseStsAndRs(Statement stmt, ResultSet rs) {
         try{
-            stmt = conn.createStatement();
-            stmt.execute(sql);
-            int effectRows = stmt.getUpdateCount();
-            result = effectRows+" rows effected.";
-            if(effectRows == -1){
-                rs = stmt.getResultSet();
-                rs.last();
-                String r = rs.getString(2);
-                result = r;
+            if(stmt != null){
+                stmt.close();
+            }
+            if(rs != null){
                 rs.close();
             }
-            stmt.close();
-        }catch(SQLException ex){
-            String msg = ex.getMessage();
-            throw new SQLBadGrammarException(msg);
-        }finally {
-            try{
-                if(stmt != null){
-                    stmt.close();
-                }
-                if(rs != null){
-                    rs.close();
-                }
-            }catch (SQLException ex){
-                ex.printStackTrace();
-            }
-
+        }catch (SQLException ex){
+            ex.printStackTrace();
         }
-        return result;
     }
 
 
-    // MySQL 8.0 以上版本 - JDBC 驱动名及数据库 URL
-    //static final String JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
-    //static final String DB_URL = "jdbc:mysql://localhost:3306/RUNOOB?useSSL=false&serverTimezone=UTC";
-
-
-
-    public  boolean testConnect(String dbUrl,String username,String pwd) {
+    /**
+     * 测试连接
+     * @param dbUrl
+     * @param username
+     * @param pwd
+     * @return
+     */
+    public  static boolean testConnect(String dbUrl,String username,String pwd) {
         boolean isConnected = false;
         Connection conn = null;
         Statement stmt = null;
@@ -348,4 +371,51 @@ public class JDBCConnection {
         return isConnected;
     }
 
+    /**
+     * 超时执行SQL查询
+     * @return
+     */
+    public static <R> R executeSQLTimeout(ExucuteSQLTimeoutFunction<String,R> f, String sql)throws Exception{
+        R result = null;
+        FutureTask<R> future = null;
+        try {
+            future = new FutureTask<>(()->f.apply(sql));
+            executor.execute(future);
+            result = future.get(60, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            throw e;
+        } finally {
+            future.cancel(true);
+        }
+        return result;
+    }
+
+    public static int getRowsCount(NewConnection currentConnection, Object tableName) throws Exception{
+        return executeSQLTimeout(t -> {
+            Connection conn = connectionPool.get(currentConnection.getUrl());
+            // 执行查询
+            Statement stmt = null;
+            ResultSet rs = null;
+            int total = 0;
+            try{
+                stmt = conn.createStatement();
+                String sqlTemplate;
+                sqlTemplate = "select count(1) from {tableName} ";
+                String sql = sqlTemplate.replace("{tableName}",t);
+                rs = stmt.executeQuery(sql);
+                while(rs.next()){
+                    total = Integer.parseInt(rs.getString(1));
+                }
+                rs.close();
+                stmt.close();
+            }catch(SQLException ex){
+                ex.printStackTrace();
+            }finally {
+                commonCloseStsAndRs(stmt,rs);
+
+            }
+            return total;
+        },tableName.toString());
+
+    }
 }

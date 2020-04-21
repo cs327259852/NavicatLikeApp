@@ -2,6 +2,7 @@ package com.chensong.main.entitys;
 
 
 import com.chensong.main.jdbc.JDBCConnection;
+import com.chensong.main.support.SystemLanguage;
 
 import javax.swing.*;
 import java.io.*;
@@ -28,13 +29,21 @@ public class NewConnection {
     private JTextField usernameTextField;
     private JTextField pwdTextField;
 
-    public NewConnection(){
-        connectionNameLabel = new JLabel("数据库名称");
-        addressLabel = new JLabel("数据库地址");
-        portLabel = new JLabel("端口");
-        schemaLabel = new JLabel("schema");
-        usernameLabel = new JLabel("用户名");
-        pwdLabel = new JLabel("密码");
+    public NewConnection(){}
+
+    public NewConnection(MessageLocale messageLocale, SystemLanguage systemLanguage){
+        connectionNameLabel = new JLabel(messageLocale.getConnectionName());
+        systemLanguage.addListener(m -> connectionNameLabel.setText(m.getConnectionName()));
+        addressLabel = new JLabel(messageLocale.getConnectionAddress());
+        systemLanguage.addListener(m -> addressLabel.setText(m.getConnectionAddress()));
+        portLabel = new JLabel(messageLocale.getConnectionPort());
+        systemLanguage.addListener(m -> portLabel.setText(m.getConnectionPort()));
+        schemaLabel = new JLabel(messageLocale.getConnectionSchema());
+        systemLanguage.addListener(m -> schemaLabel.setText(m.getConnectionSchema()));
+        usernameLabel = new JLabel(messageLocale.getConnectionUsername());
+        systemLanguage.addListener(m -> usernameLabel.setText(m.getConnectionUsername()));
+        pwdLabel = new JLabel(messageLocale.getConnectionPwd());
+        systemLanguage.addListener(m -> pwdLabel.setText(m.getConnectionPwd()));
 
         connectionNameTextField = new JTextField(null,null,20);
         addressTextField = new JTextField();
@@ -45,7 +54,7 @@ public class NewConnection {
     }
 
     /**
-     * 获取配置中所有的连接名
+     * 获取配置中所有的连接
      * @return
      */
     public static List<NewConnection> getAllConnections() {
@@ -194,11 +203,13 @@ public class NewConnection {
      */
     public boolean testConnection() {
         String dbUrl = getUrl();
-
-        JDBCConnection jdbcConnection = new JDBCConnection();
-        return jdbcConnection.testConnect(dbUrl,this.usernameTextField.getText(),this.pwdTextField.getText());
+        return JDBCConnection.testConnect(dbUrl,this.usernameTextField.getText(),this.pwdTextField.getText());
     }
 
+    /**
+     * 保存当前连接到配置文件
+     * @return
+     */
     public boolean saveConnecton() {
 
         try{
@@ -217,6 +228,10 @@ public class NewConnection {
         return true;
     }
 
+    /**
+     * 格式化当前连接成配置文件的格式
+     * @return
+     */
     private String formatClass() {
         return this.connectionNameTextField.getText()+seperator+this.addressTextField.getText()+seperator
                 +this.portTextField.getText()+seperator+this.schemaTextField.getText()+seperator
@@ -224,6 +239,11 @@ public class NewConnection {
 
     }
 
+    /**
+     * 解析字符串成一个连接对象
+     * @param line
+     * @return
+     */
     private static NewConnection parseNewConnection(String line) {
         String[] info = line.split(seperator);
         NewConnection rst = new NewConnection();
@@ -248,8 +268,12 @@ public class NewConnection {
                 '}';
     }
 
+    /**
+     * 获取当前连接的JDBC连接地址
+     * @return
+     */
     public String getUrl() {
         return "jdbc:mysql://"+this.addressTextField.getText()+":"
-                +this.portTextField.getText()+"/"+this.schemaTextField.getText()+"?useSSL=false";
+                +this.portTextField.getText()+"/"+this.schemaTextField.getText()+"?useSSL=false&zeroDateTimeBehavior=convertToNull";
     }
 }
