@@ -10,23 +10,16 @@ import com.chensong.main.uitl.BeanUtils;
 import com.mysql.jdbc.StringUtils;
 
 import javax.swing.*;
-import javax.swing.event.CaretEvent;
-import javax.swing.event.CaretListener;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
-import javax.swing.plaf.ButtonUI;
-import javax.swing.plaf.TabbedPaneUI;
-import javax.swing.plaf.basic.BasicTabbedPaneUI;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
 import javax.swing.table.TableColumn;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.TreePath;
-import javax.swing.tree.TreeSelectionModel;
 import java.awt.*;
-import java.awt.event.*;
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.util.List;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
@@ -184,6 +177,7 @@ public class Portal {
         //设置面板容器到顶级容器
         jf.setContentPane(splitPane);
 
+        jf.setIconImage(new ImageIcon("./resources/icon/app.png").getImage());
         //显示顶级容器
         jf.setVisible(true);
         //添加关闭钩子函数
@@ -629,9 +623,34 @@ public class Portal {
         systemLanguage.addListener(m -> aboutItem.setText(m.getAbout()));
         aboutItem.addActionListener(e -> {
             //新建连接被点击
-            drawNewConnectionDialog(jf);
+            showAbout();
         });
         helpOneMenu.add(aboutItem);
+    }
+
+    private static void showAbout(){
+        //创建一个摸态对话框
+        JDialog dialog = new JDialog(jf,currentMessageLocale.getAbout(),false);
+        systemLanguage.addListener(m -> dialog.setTitle(m.getAbout()));
+        //设置对话框尺寸
+        dialog.setSize(JFRAME_SIZE_WIDTH/2,JFRAME_SIZE_HEIGHT/2);
+        //设置对话框是否可改变
+        dialog.setResizable(false);
+        //设置对话框相对位置
+        dialog.setLocationRelativeTo(jf);
+
+
+
+
+        JPanel jp = new JPanel(new GridLayout(5,1));
+        jp.add(new JLabel("介绍：连接MYSQL的图形化客户端软件"));
+        jp.add(new JLabel("作者：peter"));
+        jp.add(new JLabel("QQ:327259852"));
+        jp.add(new JLabel("wechat:cs327259852"));
+        jp.add(new JLabel("版本：0.2"));
+        dialog.add(jp);
+        //显示对话框
+        dialog.setVisible(true);
     }
 
     /**
