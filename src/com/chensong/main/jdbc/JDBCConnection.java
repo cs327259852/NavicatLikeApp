@@ -43,18 +43,18 @@ public class JDBCConnection {
      */
     private static Connection getConnectionFromPool(String url,String username,String pwd){
         Connection c = connectionPool.get(url);
-        if(c == null){
-            // 打开链接
-            try {
+        try {
+            if(c == null || c.isClosed()){
+                // 打开链接
                 Connection conn = DriverManager.getConnection(url,
                         username,pwd);
                 connectionPool.put(url,conn);
                 c = conn;
-            } catch (SQLException e) {
-                e.printStackTrace();
             }
-
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
+
         return c;
     }
 
