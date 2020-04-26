@@ -274,6 +274,6 @@ public class NewConnection {
      */
     public String getUrl() {
         return "jdbc:mysql://"+this.addressTextField.getText()+":"
-                +this.portTextField.getText()+"/"+this.schemaTextField.getText()+"?useSSL=false&zeroDateTimeBehavior=convertToNull";
+                +this.portTextField.getText()+"/"+this.schemaTextField.getText()+"?useSSL=false&zeroDateTimeBehavior=convertToNull&autoReconnect=true";
     }
 }
