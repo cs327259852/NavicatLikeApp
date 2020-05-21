@@ -20,6 +20,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.net.URL;
 import java.util.List;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
@@ -130,6 +131,18 @@ public class Portal {
      */
     public static SystemLanguage systemLanguage = new SystemLanguage();
 
+    private static URL firstPageIconURL ,appSourceURL,prevPageResourceURL,
+            nextPageResourceURL,lastPageResourceURL,refreshResourceURL;
+    //加载资源
+    static{
+        appSourceURL = Portal.class.getResource("/icon/app.png");
+        firstPageIconURL = Portal.class.getResource("/icon/first.png");
+        prevPageResourceURL = Portal.class.getResource("/icon/prev.png");
+        nextPageResourceURL = Portal.class.getResource("/icon/next.png");
+        lastPageResourceURL = Portal.class.getResource("/icon/last.png");
+        refreshResourceURL = Portal.class.getResource("/icon/refresh.png");
+    }
+
     public static void main(String[] args) {
         currentMessageLocale = MessageLocale.getMessageLocale(Locale.SIMPLIFIED_CHINESE);
         // 确保一个漂亮的外观风格
@@ -177,7 +190,7 @@ public class Portal {
         //设置面板容器到顶级容器
         jf.setContentPane(splitPane);
 
-        jf.setIconImage(new ImageIcon("./resources/icon/app.png").getImage());
+        jf.setIconImage(new ImageIcon(appSourceURL).getImage());
         //显示顶级容器
         jf.setVisible(true);
         //添加关闭钩子函数
@@ -290,12 +303,17 @@ public class Portal {
             connectDbClicked(selectTreeNode.getParent().getParent().getIndex(selectTreeNode.getParent()));
             //点击二级树中的 表 节点
             currentConnection = connections.get(connectionIdx);
-            List<String> tables = JDBCConnection.showTables(currentConnection);
-            for(String table:tables){
-                DefaultMutableTreeNode tableNode = new DefaultMutableTreeNode(table);
-                selectTreeNode.add(tableNode);
+            List<String> tables = null;
+            try {
+                tables = JDBCConnection.showTables(currentConnection);
+                for(String table:tables){
+                    DefaultMutableTreeNode tableNode = new DefaultMutableTreeNode(table);
+                    selectTreeNode.add(tableNode);
+                }
+                connectionJTree.repaint();
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-            connectionJTree.repaint();
         }else if(selectIdx == 1){
             //点击了查询，创建查询三级树 undo
         }
@@ -306,9 +324,15 @@ public class Portal {
      */
     private static void connectDbClicked(int selectedIndex) {
         currentConnection = connections.get(selectedIndex);
-        List<String> tables = JDBCConnection.showTables(currentConnection);
-        tablesArr = tables.toArray(new String[tables.size()]);
-        tablesJList.setListData(tablesArr);
+        List<String> tables = null;
+        try {
+            tables = JDBCConnection.showTables(currentConnection);
+            tablesArr = tables.toArray(new String[tables.size()]);
+            tablesJList.setListData(tablesArr);
+        } catch (Exception e) {
+            e.printStackTrace();
+
+        }
 
     }
 
@@ -385,7 +409,7 @@ public class Portal {
         FitTableColumns(table);
         // 把 表格 放到 滚动面板 中（表头将自动添加到滚动面板顶部）
         JToolBar jFooterBar = new JToolBar();
-        JButton firstPageBtn = new JButton("",new ImageIcon("./resources/icon/first.png"));
+        JButton firstPageBtn = new JButton("",new ImageIcon(firstPageIconURL));
         firstPageBtn.setSize(50,50);
         NewConnection rowConnection = new NewConnection();
         BeanUtils.deepCopy(currentConnection,rowConnection);
@@ -398,7 +422,7 @@ public class Portal {
                 }
             });
             jFooterBar.add(firstPageBtn);
-            JButton prevPageBtn = new JButton("",new ImageIcon("./resources/icon/prev.png"));
+            JButton prevPageBtn = new JButton("",new ImageIcon(prevPageResourceURL));
 
             prevPageBtn.addMouseListener(new MouseAdapter() {
                 @Override
@@ -408,7 +432,7 @@ public class Portal {
                 }
             });
             jFooterBar.add(prevPageBtn);
-            JButton nextPageBtn = new JButton("",new ImageIcon("./resources/icon/next.png"));
+            JButton nextPageBtn = new JButton("",new ImageIcon(nextPageResourceURL));
             nextPageBtn.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseClicked(MouseEvent e) {
@@ -417,7 +441,7 @@ public class Portal {
             });
             jFooterBar.add(nextPageBtn);
 
-            JButton lastPageBtn = new JButton("",new ImageIcon("./resources/icon/last.png"));
+            JButton lastPageBtn = new JButton("",new ImageIcon(lastPageResourceURL));
             lastPageBtn.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseClicked(MouseEvent e) {
@@ -425,7 +449,7 @@ public class Portal {
                 }
             });
             jFooterBar.add(lastPageBtn);
-            JButton refreshBtn = new JButton("",new ImageIcon("./resources/icon/refresh.png"));
+            JButton refreshBtn = new JButton("",new ImageIcon(refreshResourceURL));
             refreshBtn.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseClicked(MouseEvent e) {

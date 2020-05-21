@@ -13,7 +13,7 @@ import java.util.List;
  * 封装新建连接的所有组件
  */
 public class NewConnection {
-    private static String filePath = "resources/connections.conf";
+    private static String filePath = "/connections.conf";
     private static String seperator = ":";
 
     private JLabel connectionNameLabel;
@@ -60,8 +60,9 @@ public class NewConnection {
     public static List<NewConnection> getAllConnections() {
         BufferedReader fr = null;
         try{
+            InputStream confFileIs = NewConnection.class.getResourceAsStream(filePath);
             List<NewConnection> list = new ArrayList();
-             fr = new BufferedReader(new FileReader(filePath));
+             fr = new BufferedReader(new InputStreamReader(confFileIs));
             String line;
             while((line = fr.readLine()) != null){
                 if(line.trim().length() == 0){
@@ -213,6 +214,7 @@ public class NewConnection {
     public boolean saveConnecton() {
 
         try{
+            System.out.println(this.getClass().getResource("/connections.conf"));
             File file = new File(filePath);
             if(!file.exists()){
                 file.createNewFile();
@@ -268,7 +270,7 @@ public class NewConnection {
                 '}';
     }
 
-    /**
+    /**ls
      * 获取当前连接的JDBC连接地址
      * @return
      */

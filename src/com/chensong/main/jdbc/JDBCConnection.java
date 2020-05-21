@@ -63,34 +63,37 @@ public class JDBCConnection {
      * @param newConnection
      * @return
      */
-    public static List<String> showTables(NewConnection newConnection) {
-        List<String> tablesList = new ArrayList<>();
-        Connection conn = null;
-        Statement stmt = null;
-        try{
+    public static List<String> showTables(NewConnection newConnection) throws Exception{
+        return executeSQLTimeout(i -> {
+            List<String> tablesList = new ArrayList<>();
+            Connection conn = null;
+            Statement stmt = null;
+            try{
 
-            // 打开链接
-            conn = getConnectionFromPool(newConnection.getUrl(),
-                    newConnection.getUsernameTextField().getText(),newConnection.getPwdTextField().getText());
-            // 执行查询
-            stmt = conn.createStatement();
-            String sql;
-            sql = "show tables;";
-            ResultSet rs = stmt.executeQuery(sql);
-            while(rs.next()){
-                tablesList.add( rs.getString("Tables_in_"+newConnection.getSchemaTextField().getText()));
+                // 打开链接
+                conn = getConnectionFromPool(newConnection.getUrl(),
+                        newConnection.getUsernameTextField().getText(),newConnection.getPwdTextField().getText());
+                // 执行查询
+                stmt = conn.createStatement();
+                String sql;
+                sql = "show tables;";
+                ResultSet rs = stmt.executeQuery(sql);
+                while(rs.next()){
+                    tablesList.add( rs.getString("Tables_in_"+newConnection.getSchemaTextField().getText()));
+                }
+                // 完成后关闭
+                rs.close();
+                stmt.close();
+            }catch(SQLException se){
+                // 处理 JDBC 错误
+                se.printStackTrace();
+            }catch(Exception e){
+                // 处理 Class.forName 错误
+                e.printStackTrace();
             }
-            // 完成后关闭
-            rs.close();
-            stmt.close();
-        }catch(SQLException se){
-            // 处理 JDBC 错误
-            se.printStackTrace();
-        }catch(Exception e){
-            // 处理 Class.forName 错误
-            e.printStackTrace();
-        }
-        return tablesList;
+            return tablesList;
+        },null);
+
     }
 
     /**
@@ -376,18 +379,19 @@ public class JDBCConnection {
      * @return
      */
     public static <R> R executeSQLTimeout(ExucuteSQLTimeoutFunction<String,R> f, String sql)throws Exception{
-        R result = null;
-        FutureTask<R> future = null;
-        try {
-            future = new FutureTask<>(()->f.apply(sql));
-            executor.execute(future);
-            result = future.get(60, TimeUnit.SECONDS);
-        } catch (Exception e) {
-            throw e;
-        } finally {
-            future.cancel(true);
-        }
-        return result;
+        return f.apply(sql);
+        //        R result = null;
+//            FutureTask<R> future = null;
+//            try {
+//                future = new FutureTask<>(()->f.apply(sql));
+//                executor.execute(future);
+//                result = future.get(60, TimeUnit.SECONDS);
+//            } catch (Exception e) {
+//                throw e;
+//            } finally {
+//            future.cancel(true);
+//        }
+//        return result;
     }
 
     public static int getRowsCount(NewConnection currentConnection, Object tableName) throws Exception{
