@@ -5,14 +5,14 @@ import com.chensong.main.exception.SQLBadGrammarException;
 import com.chensong.main.support.ExucuteSQLTimeoutFunction;
 
 import java.sql.*;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.*;
-import java.util.function.Function;
-import java.util.function.Predicate;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 
 public class JDBCConnection {
 
@@ -198,7 +198,11 @@ public class JDBCConnection {
      * 执行用户自定义语句的查询语句
      */
     public static Map<String,Object> getTableRowsByCustomer(NewConnection currentConnection, String sql) throws Exception {
-       return executeSQLTimeout((t) ->{
+       //限制最多查询1k条
+        sql = sql.replace(";","");
+        String randomName = "_T"+Math.round(Math.random()*10000);
+        sql = "select "+randomName+".* from ("+sql+") "+randomName+" limit 1000;";
+        return executeSQLTimeout((t) ->{
             Map<String,Object> result = new HashMap<>();
             Connection conn = getConnectionFromPool(currentConnection.getUrl(),currentConnection.getUsernameTextField().getText(),currentConnection.getPwdTextField().getText());
             // 执行查询
@@ -206,7 +210,7 @@ public class JDBCConnection {
             ResultSet rs = null;
             String[][] rows =null;
             try{
-                stmt = conn.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE,ResultSet.CONCUR_UPDATABLE);
+                stmt = conn.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE,ResultSet.CONCUR_READ_ONLY);
                 rs = stmt.executeQuery(t);
                 rs.last();
                 //记录总行数
