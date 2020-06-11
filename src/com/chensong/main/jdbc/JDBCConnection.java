@@ -379,19 +379,18 @@ public class JDBCConnection {
      * @return
      */
     public static <R> R executeSQLTimeout(ExucuteSQLTimeoutFunction<String,R> f, String sql)throws Exception{
-        return f.apply(sql);
-        //        R result = null;
-//            FutureTask<R> future = null;
-//            try {
-//                future = new FutureTask<>(()->f.apply(sql));
-//                executor.execute(future);
-//                result = future.get(60, TimeUnit.SECONDS);
-//            } catch (Exception e) {
-//                throw e;
-//            } finally {
-//            future.cancel(true);
-//        }
-//        return result;
+            R result = null;
+            FutureTask<R> future = null;
+            try {
+                future = new FutureTask<>(()->f.apply(sql));
+                executor.execute(future);
+                result = future.get(60, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                throw e;
+            } finally {
+            future.cancel(true);
+        }
+        return result;
     }
 
     public static int getRowsCount(NewConnection currentConnection, Object tableName) throws Exception{
